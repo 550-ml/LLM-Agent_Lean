@@ -34,7 +34,7 @@ class HilbertCoordinator:
         self.theorem_corrections = 5
         self.subgoal_corrections = 5
         self.head_theorems_sketch = 5
-        self.prover_attemps = 5
+        self.prover_attemps = 1
         self.general_llm_proof_attemps = 5
 
     def generate_proof(
@@ -163,11 +163,12 @@ class HilbertCoordinator:
             valid, verified_subgoals, proved_subgoals, error_justification = self.validate_subgoals(subgoals, header)
             if valid:
                 logger.info(f"Subgoals validated: {len(verified_subgoals)} verified, {len(proved_subgoals)} proved")
+                logger.info(f"proved_subgoals: {proved_subgoals}")
                 return sketch_assembled, verified_subgoals, proved_subgoals
             else:
                 logger.warning(f"Subgoal validation failed: {error_justification}")
-                refined_sketch = self.refine_sketch_based_error(sketch, error_justification)
-                sketch = refined_sketch
+                sketch = self.refine_sketch_based_error(sketch, error_justification)
+
         logger.warning("All sketch correction attempts failed")
         return None, None, None
 
@@ -337,7 +338,7 @@ class HilbertCoordinator:
             logger.info(f"Proof LLM: {proof}")
             if not proof:
                 continue
-            verified, error_message = self.verification.execute(proof)
+            verified, error_message = self.verification.execute(header + "\n" + proof)
             logger.info(f"Verified: {verified}, Error message: {error_message}")
             if verified:
                 return proof
@@ -370,15 +371,16 @@ class HilbertCoordinator:
         depth,
     ):
         """证明所有子问题"""
-        remaining = [s for s in subgoals if s not in proved_subgoals]
+        # proved_subgoals是dict，subgoals是list
+        # 先处理 None 情况，避免在列表推导式中出错
+        subgoals_proved = dict(proved_subgoals) if proved_subgoals is not None else {}
+        remaining = [s for s in subgoals if s not in subgoals_proved]
         logger.info(f"Solving {len(remaining)} remaining subgoals (out of {len(subgoals)} total)")
-        subgoals_proved = {}
-        for subgoal in subgoals:
-            if subgoal not in proved_subgoals:
-                proof = self.solve_subgoal(subgoal, header, depth)
-                if proof is not None:
-                    subgoals_proved[subgoal] = proof
-                    logger.info(f"Subgoal solved: {subgoal[:100]}...")
+        for subgoal in remaining:
+            proof = self.solve_subgoal(subgoal, header, depth)
+            if proof is not None:
+                subgoals_proved[subgoal] = proof
+                logger.info(f"Subgoal solved: {subgoal[:100]}...")
 
         # * 4.4 组装证明
         final_proof = self.concatenate_proofs(header, subgoals_proved, sketch_assembled)

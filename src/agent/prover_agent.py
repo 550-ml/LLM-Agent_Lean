@@ -70,16 +70,9 @@ class ProverAgent:
 You are a Lean 4 prover.
 Complete the following Lean 4 code so that it compiles.
 
-Rules:
-1. Output ONLY a single Lean code block (```lean ... ```).
-2. Do NOT include any explanation, proof plan, or comments.
-3. Do NOT include imports or open statements unless they already appear in the given code.
-4. Do NOT use `sorry`.
-5. Do NOT change the theorem/lemma statement (name, arguments, types, statement). Only fill in the proof.
-6. Keep the result self-contained and compilable.
-
 ```lean
 {full_code}
+```
 """.strip()
 
         chat = [{"role": "user", "content": prompt}]
@@ -93,6 +86,9 @@ Rules:
                 return_tensors="pt",
             )
 
+            # 获取输入长度（用于后续移除 prompt）
+            input_length = encoded.shape[1]
+
             # 生成证明
             start_time = time.time()
             outputs = self._model.generate(
@@ -101,16 +97,18 @@ Rules:
                 pad_token_id=self._tokenizer.pad_token_id,
             )
 
-            # 解码输出
-            generated_text = self._tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+            # 只解码新生成的部分（移除输入 prompt）
+            generated_ids = outputs[0][input_length:]
+            generated_text = self._tokenizer.decode(generated_ids, skip_special_tokens=True)
 
             logger.debug(f"Prover generation time: {time.time() - start_time:.2f}s")
-            logger.info(f"prover Generated text: {generated_text}")
+            logger.info(f"Prover generated text (without prompt): {generated_text}")
+
             # 提取 Lean 代码块（如果有）
             pattern = re.compile(r"```(?:lean4?)\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
             matches = pattern.findall(generated_text)
             if matches:
-                return matches[0]
+                return matches[-1]
 
             # 如果没有代码块，返回整个响应（可能需要进一步处理）
             return generated_text
@@ -118,3 +116,13 @@ Rules:
         except Exception as e:
             logger.error(f"Error in prove_subgoal: {e}")
             return ""
+
+
+TEXT = """
+Rules:
+1. Output ONLY a single Lean code block (```lean ... ```).
+2. Do NOT include any explanation, proof plan, or comments.
+3. Do NOT include imports or open statements unless they already appear in the given code.
+4. Do NOT use `sorry`.
+5. Do NOT change the theorem/lemma statement (name, arguments, types, statement). Only fill in the proof.
+6. Keep the result self-contained and compilable."""

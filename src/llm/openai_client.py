@@ -5,10 +5,9 @@ OpenAI API 客户端实现
 
 import os
 import time
-import logging
-from typing import List, Dict, Optional
-from openai import OpenAI
-from openai import APIError, RateLimitError, APIConnectionError
+from typing import Dict, List
+
+from openai import APIConnectionError, APIError, APITimeoutError, OpenAI, RateLimitError
 
 from .base import BaseLLM, LLMConfig, LLMResponse, logger
 
@@ -35,13 +34,14 @@ class OpenAIClient(BaseLLM):
         api_key = config.api_key or os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError(
-                "OpenAI API key is required. Set OPENAI_API_KEY environment variable or pass it in config.")
+                "OpenAI API key is required. Set OPENAI_API_KEY environment variable or pass it in config."
+            )
 
         # 创建 OpenAI 客户端
         self.client = OpenAI(
             api_key=api_key,
             base_url=config.base_url,  # 支持自定义 base_url（如用于代理）
-            timeout=config.timeout
+            timeout=config.timeout,
         )
 
     def generate(self, messages: List[Dict[str, str]], **kwargs) -> LLMResponse:
@@ -62,16 +62,15 @@ class OpenAIClient(BaseLLM):
         # 验证消息格式
         if not self.validate_messages(messages):
             raise ValueError(
-                "Invalid messages format. Messages must be a list of dicts with 'role' and 'content' keys.")
+                "Invalid messages format. Messages must be a list of dicts with 'role' and 'content' keys."
+            )
 
         # 合并配置和 kwargs
         temperature = kwargs.get("temperature", self.config.temperature)
         max_tokens = kwargs.get("max_tokens", self.config.max_tokens)
         top_p = kwargs.get("top_p", self.config.top_p)
-        frequency_penalty = kwargs.get(
-            "frequency_penalty", self.config.frequency_penalty)
-        presence_penalty = kwargs.get(
-            "presence_penalty", self.config.presence_penalty)
+        frequency_penalty = kwargs.get("frequency_penalty", self.config.frequency_penalty)
+        presence_penalty = kwargs.get("presence_penalty", self.config.presence_penalty)
 
         # 准备 API 参数
         api_params = {
@@ -94,8 +93,7 @@ class OpenAIClient(BaseLLM):
         last_error = None
         for attempt in range(max_retries):
             try:
-                logger.debug(
-                    f"OpenAI API call (attempt {attempt + 1}/{max_retries}): model={self.config.model_name}")
+                logger.debug(f"OpenAI API call (attempt {attempt + 1}/{max_retries}): model={self.config.model_name}")
 
                 # 调用 OpenAI API
                 completion = self.client.chat.completions.create(**api_params)
@@ -112,37 +110,44 @@ class OpenAIClient(BaseLLM):
                 }
 
                 logger.debug(
-                    f"OpenAI API success: tokens={usage['total_tokens']}, finish_reason={choice.finish_reason}")
+                    f"OpenAI API success: tokens={usage['total_tokens']}, finish_reason={choice.finish_reason}"
+                )
 
                 return LLMResponse(
-                    content=content,
-                    model=completion.model,
-                    usage=usage,
-                    finish_reason=choice.finish_reason or "stop"
+                    content=content, model=completion.model, usage=usage, finish_reason=choice.finish_reason or "stop"
                 )
 
             except RateLimitError as e:
                 last_error = e
                 if attempt < max_retries - 1:
-                    wait_time = retry_delay * (2 ** attempt)  # 指数退避
-                    logger.warning(
-                        f"Rate limit exceeded, retrying in {wait_time}s...")
+                    wait_time = retry_delay * (2**attempt)  # 指数退避
+                    logger.warning(f"Rate limit exceeded, retrying in {wait_time}s...")
                     time.sleep(wait_time)
                 else:
-                    logger.error(
-                        f"Rate limit exceeded after {max_retries} attempts")
+                    logger.error(f"Rate limit exceeded after {max_retries} attempts")
                     raise
 
             except APIConnectionError as e:
                 last_error = e
                 if attempt < max_retries - 1:
-                    wait_time = retry_delay * (2 ** attempt)
-                    logger.warning(
-                        f"API connection error, retrying in {wait_time}s...")
+                    wait_time = retry_delay * (2**attempt)
+                    logger.warning(f"API connection error, retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"API connection failed after {max_retries} attempts")
+                    raise
+
+            except APITimeoutError as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2**attempt)
+                    logger.warning(f"API timeout error (timeout={self.config.timeout}s), retrying in {wait_time}s...")
                     time.sleep(wait_time)
                 else:
                     logger.error(
-                        f"API connection failed after {max_retries} attempts")
+                        f"API timeout after {max_retries} attempts (timeout={self.config.timeout}s). "
+                        f"Consider increasing timeout in config if requests are taking longer."
+                    )
                     raise
 
             except APIError as e:
@@ -153,9 +158,8 @@ class OpenAIClient(BaseLLM):
             except Exception as e:
                 last_error = e
                 if attempt < max_retries - 1:
-                    wait_time = retry_delay * (2 ** attempt)
-                    logger.warning(
-                        f"Unexpected error, retrying in {wait_time}s: {e}")
+                    wait_time = retry_delay * (2**attempt)
+                    logger.warning(f"Unexpected error, retrying in {wait_time}s: {e}")
                     time.sleep(wait_time)
                 else:
                     logger.error(f"Failed after {max_retries} attempts: {e}")
@@ -182,10 +186,8 @@ class OpenAIClient(BaseLLM):
         temperature = kwargs.get("temperature", self.config.temperature)
         max_tokens = kwargs.get("max_tokens", self.config.max_tokens)
         top_p = kwargs.get("top_p", self.config.top_p)
-        frequency_penalty = kwargs.get(
-            "frequency_penalty", self.config.frequency_penalty)
-        presence_penalty = kwargs.get(
-            "presence_penalty", self.config.presence_penalty)
+        frequency_penalty = kwargs.get("frequency_penalty", self.config.frequency_penalty)
+        presence_penalty = kwargs.get("presence_penalty", self.config.presence_penalty)
 
         api_params = {
             "model": self.config.model_name,
@@ -193,7 +195,7 @@ class OpenAIClient(BaseLLM):
             "temperature": temperature,
             "max_tokens": max_tokens,
             "top_p": top_p,
-            "stream": True
+            "stream": True,
         }
 
         # o1 系列不支持这些参数
@@ -223,36 +225,30 @@ class OpenAIClient(BaseLLM):
         """
         try:
             import tiktoken
+
             # 对于 o1 系列，使用 cl100k_base 编码
             if self.config.model_name in ["o1-preview", "o1-mini"]:
                 encoding = tiktoken.get_encoding("cl100k_base")
             else:
                 try:
-                    encoding = tiktoken.encoding_for_model(
-                        self.config.model_name)
+                    encoding = tiktoken.encoding_for_model(self.config.model_name)
                 except KeyError:
                     # 如果模型不在 tiktoken 的已知列表中，使用默认编码
                     encoding = tiktoken.get_encoding("cl100k_base")
 
             return len(encoding.encode(text))
         except ImportError:
-            logger.warning(
-                "tiktoken not available, using character count as approximation")
+            logger.warning("tiktoken not available, using character count as approximation")
             # 粗略估算：1 token ≈ 4 个字符（英文）
             return len(text) // 4
         except Exception as e:
-            logger.warning(
-                f"Error counting tokens: {e}, using character count")
+            logger.warning(f"Error counting tokens: {e}, using character count")
             return len(text) // 4
 
 
 if __name__ == "__main__":
     config = LLMConfig(
-        model_name="gpt-4o",
-        temperature=0.7,
-        max_tokens=2048,
-        max_retries=3,
-        base_url="https://api.chatanywhere.tech"
+        model_name="gpt-4o", temperature=0.7, max_tokens=2048, max_retries=3, base_url="https://api.chatanywhere.tech"
     )
     client = OpenAIClient(config)
     messages = [{"role": "user", "content": "Hello, how are you?"}]

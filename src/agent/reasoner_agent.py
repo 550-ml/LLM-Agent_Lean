@@ -22,7 +22,7 @@ class ReasonerAgent(BaseAgent):
         self.prompt_loader = prompt_loader
 
     def _normalize_lean_code(self, code: str) -> str:
-        """规范化 Lean 代码：移除 import/open 语句和包装文本
+        """规范化 Lean 代码：只移除 import/open 语句
 
         Args:
             code: 原始 Lean 代码
@@ -32,59 +32,18 @@ class ReasonerAgent(BaseAgent):
         """
         if not code:
             return ""
-
         lines = code.splitlines()
         cleaned_lines = []
-        in_outer_namespace = False
-        namespace_depth = 0
-
         for line in lines:
             stripped = line.strip()
-
-            # 移除 import 语句（所有位置的 import）
             if stripped.startswith("import "):
                 continue
-
-            # 移除 open 语句（所有位置的 open）
             if stripped.startswith("open "):
                 continue
-
-            # 处理 namespace：只移除最外层的 namespace ... end 包装
-            if stripped.startswith("namespace "):
-                if namespace_depth == 0:
-                    # 最外层的 namespace，标记并跳过
-                    in_outer_namespace = True
-                    namespace_depth += 1
-                    continue
-                else:
-                    # 嵌套的 namespace，保留
-                    namespace_depth += 1
-                    cleaned_lines.append(line)
-                    continue
-
-            if stripped == "end":
-                if in_outer_namespace and namespace_depth == 1:
-                    # 最外层的 end，移除
-                    in_outer_namespace = False
-                    namespace_depth = 0
-                    continue
-                elif namespace_depth > 1:
-                    # 嵌套的 end，保留
-                    namespace_depth -= 1
-                    cleaned_lines.append(line)
-                    continue
-                # 其他情况（不在 namespace 中的 end）保留
-
-            # 保留所有其他行
             cleaned_lines.append(line)
-
-        # 重新组合，去除首尾空行
         result = "\n".join(cleaned_lines).strip()
-
-        # 确保以换行符结尾（如果代码不为空）
         if result:
             result = result.rstrip() + "\n"
-
         return result
 
     def _extract_lean_code(self, response: str) -> str:
@@ -283,6 +242,7 @@ class ReasonerAgent(BaseAgent):
                 {"role": "user", "content": user_prompt},
             ]
         )
+        logger.info(f"sketch response: {response}")
         return self._extract_lean_code(response)
 
     def correct_sketch_error(

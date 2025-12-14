@@ -13,25 +13,14 @@ llm:
   reasoner:
     model_name: "gpt-5.1-ca"  # 检索智能体使用的模型
     temperature: 1.0
-    max_tokens: 4500
+    max_tokens: 3000
     top_p: 1.0
     frequency_penalty: 0.0
     presence_penalty: 0.0
     max_retries: 3
     retry_delay: 1.0
     base_url: "https://api.chatanywhere.tech"
-
-  verification:
-    model: "gpt-4o-mini"  # 验证智能体使用的模型
-    temperature: 0.7
-    max_tokens: 2048
-    top_p: 1.0
-    frequency_penalty: 0.0
-    presence_penalty: 0.0
-    max_retries: 3
-    retry_delay: 1.0
-    timeout: 60
-    base_url: "https://api.chatanywhere.tech"
+    timeout: 240  # API 超时时间（秒），对于生成大量 token 的请求，建议设置为 180 或更大
 
 # Agent 配置
 agent:
