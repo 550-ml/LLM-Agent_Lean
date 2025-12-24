@@ -7,7 +7,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 
 @dataclass
@@ -41,27 +41,36 @@ class PutnamLoader:
 
     def _parse_lean_file(self, content: str, file_path: str) -> PutnamProblem:
         """解析 Lean4 文件（简化版）"""
-        # 提取 imports
-        imports = "\n".join(re.findall(r"^import\s+.*$", content, re.MULTILINE))
-
-        # 提取 opens
-        opens = "\n".join(re.findall(r"^open\s+.*$", content, re.MULTILINE))
-
-        # 合并 header（imports + opens）
-        header = f"{imports}\n{opens}".strip()
-
         # 提取 docstring
         docstring_match = re.search(r"/--(.*?)-/", content, re.DOTALL)
         docstring = docstring_match.group(1).strip() if docstring_match else ""
 
-        # 提取 theorem 语句（从 theorem 开始到文件末尾）
-        theorem_match = re.search(r"(?:theorem|def|abbrev)\s+\w+", content)
+        # 提取 header：从文件开头到 /-- 之前的所有内容
+        if docstring_match:
+            # 如果找到 docstring，提取从开头到 /-- 之前的内容
+            header = content[: docstring_match.start()].strip()
+        else:
+            # 如果没找到 docstring，提取从开头到第一个 theorem/def/abbrev 之前的内容
+            theorem_match = re.search(r"(?:theorem|def|abbrev)\s+\w+", content)
+            if theorem_match:
+                header = content[: theorem_match.start()].strip()
+            else:
+                # 如果都没找到，使用原来的逻辑（只提取 import 和 open）
+                imports = "\n".join(re.findall(r"^import\s+.*$", content, re.MULTILINE))
+                opens = "\n".join(re.findall(r"^open\s+.*$", content, re.MULTILINE))
+                header = f"{imports}\n{opens}".strip()
+
+        # 提取 theorem 语句（优先从 theorem 或 def 开始，如果找不到再考虑 abbrev）
+        # 先尝试匹配 theorem 或 def
+        theorem_match = re.search(r"(?:theorem|def)\s+\w+", content)
+        if not theorem_match:
+            # 如果找不到 theorem 或 def，再尝试匹配 abbrev
+            theorem_match = re.search(r"abbrev\s+\w+", content)
         if not theorem_match:
             raise ValueError(f"无法找到定理: {file_path}")
 
         problem = content[theorem_match.start() :].strip()
-
-        return PutnamProblem(
+        pro = PutnamProblem(
             file_path=file_path,
             file_name=Path(file_path).name,
             total_content=content,
@@ -69,6 +78,8 @@ class PutnamLoader:
             problem=problem,
             docstring=docstring,
         )
+        print(pro)
+        return pro
 
     def list_all_problems(self) -> List[str]:
         """

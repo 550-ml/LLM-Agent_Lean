@@ -58,3 +58,9 @@ proved_subgoals["1"] = "1"
 proved_subgoals["2"] = "2"
 remaining = [s for s in subgoals if s not in proved_subgoals]
 print(remaining)
+
+provered = {}
+for index, subgoal in enumerate(subgoals):
+    provered[index] = "ans"
+
+print(provered)

@@ -1,36 +1,66 @@
-You are helping solve a Lean theorem proving problem using the mathlib library.
+You are generating semantic search queries for similarity-based retrieval
+against mathlib-style informal mathematical descriptions.
 
-Before attempting to write the proof, you must first search for relevant theorems and  lemmas.
+Purpose:
+Each query will be embedded and compared against informal descriptions
+written in the style of mathlib documentation and mathematical textbooks.
+Queries MUST be semantically close to the given informal description
+and use similar mathematical vocabulary and phrasing.
 
-Search Process:
-	1.	Identify key concepts: Break down the problem into mathematical concepts, operations, and structures involved.
-	2.	Generate search queries: For each concept, create informal search strings that describe:
+IMPORTANT:
+The target corpus consists of mathlib informal descriptions
+(e.g. “Let E be a complete normed space…”, “Assume f is continuous…”).
+Your queries should SOUND LIKE such descriptions.
 
-	•	Relevant theorems or results (e.g., “associativity of addition”, “existence of inverse elements”)
-	•	Useful tactics (e.g., “simplify arithmetic expressions”, “split conjunctions”)
-	•	Properties (e.g., “group structure on integers”, “metric space properties”)
-	•	Relevant definitions useful for the proof or any used theorem (e.g. “definition of a group”, “definition of a metric space”)
-
-Search Query Format:
-Enclose each search query in <search>...</search> tags with your informal description.
-Limit yourself to a maximum of 5 search queries.
-Make the search queries simple, concise, and clear.
-
-Guidelines:
-	•	You can either search by theorem name or natural language description
-	•	Search for theorems that might automate parts of the proof
-	•	Consider edge cases and special conditions mentioned in the problem
-
-Problem to Solve:
+Inputs:
+Problem statement:
 {problem}
 
 Informal description:
 {docstring}
 
-Error Context (if any):
+Error context (optional):
 {error_message}
 
-Example Output:
-<search>properties of convex hull in real plane</search>
-<search>theorems about cardinality of finite sets</search>
-<search>collinearity and general position</search>
+Instructions:
+
+1) Carefully read the informal description and identify its core mathematical content.
+
+2) Extract (mentally, do NOT list explicitly):
+   - Mathematical objects and their types
+   - Structural assumptions or axioms
+   - The form of the statement (e.g. implication, equivalence, existence)
+   - The dominant reasoning pattern (e.g. substitution, rewriting, limit argument)
+
+3) Generate 3–5 SHORT natural-language queries that:
+   - could plausibly appear as mathlib-style informal descriptions
+   - use similar vocabulary and sentence structure to the given description
+   - each emphasize a DIFFERENT semantic aspect:
+       • objects / setting
+       • assumptions / hypotheses
+       • conclusion / goal
+       • reasoning pattern
+       • (optional) abstract viewpoint
+
+4) Constraints:
+   - Each query should be 8–20 words.
+   - Queries must NOT be paraphrases of each other.
+   - Do NOT repeat the original description verbatim.
+   - Do NOT mention Lean, mathlib, tactics, or lemma names.
+   - Avoid overly generic phrases (e.g. “abstract algebra problem”).
+   - Prefer mathlib-like phrasing (“structure with…”, “satisfying…”, “show that…”).
+
+Output format (STRICT):
+Output ONLY the queries.
+Wrap each query in <search>...</search>.
+Do not output explanations or extra text.
+
+Example:
+
+Informal description:
+"For a topological group with zero $\alpha$ and a nonzero element $c \in \alpha$, the inverse of the left multiplication homeomorphism $x \mapsto c \cdot x$ is given by $x \mapsto c^{{-1}} \cdot x$."
+
+Output:
+<search>functions from R times R into a complete normed space</search>
+<search>continuous vector valued functions on a product of real lines</search>
+<search>analysis problem involving completeness and functions of two variables</search>

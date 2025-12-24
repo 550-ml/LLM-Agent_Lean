@@ -34,7 +34,11 @@ class LLMFactory:
         model_name = config.model_name.lower()
 
         # OpenAI 模型（包括 GPT 系列和 O 系列）
-        if model_name.startswith("gpt-") or (model_name.startswith("o") and not model_name.startswith("ollama")):
+        if (
+            model_name.startswith("gpt-")
+            or model_name.startswith("deepseek")
+            or (model_name.startswith("o") and not model_name.startswith("ollama"))
+        ):
             return OpenAIClient(config)
 
         # vLLM 本地模型

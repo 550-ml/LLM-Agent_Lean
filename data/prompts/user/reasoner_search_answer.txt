@@ -1,6 +1,8 @@
-You are helping to solve a Lean theorem proving problem using the mathlib library. 
+You are selecting relevant items from a GIVEN candidate list for a Lean 4 proof.
 
-The problem is: 
+
+Inputs:
+Problem:
 {problem}  
 
 Informal description:
@@ -9,8 +11,10 @@ Informal description:
 Here are some potentially relevant theorems and definitions: 
 {theorems}  
 
+
 Instructions: 
 1. Select important theorems and definitions necessary to solve the problem. 
 2. IMPORTANT: ONLY SELECT theorems from the GIVEN list. 3. Enclose each of them in separate <theorem> tags. 
 4. Only state the full names of the theorems. Do NOT include the module name. 
 5. Select all theorems that could be useful in the intermediate steps of the proof.
+6. You can select many theorems, but each of them in separate <theorem> tags.  

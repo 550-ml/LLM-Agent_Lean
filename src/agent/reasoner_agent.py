@@ -76,6 +76,27 @@ class ReasonerAgent(BaseAgent):
         # 3. 规范化代码：移除 import/open 和包装文本
         return self._normalize_lean_code(code)
 
+    def _extract_informal_proof(self, response: str) -> str:
+        """提取 <informal_proof>...</informal_proof> 标签中的内容
+
+        Args:
+            response: LLM 的响应文本
+
+        Returns:
+            str: 提取的非形式证明内容，如果未找到标签则返回原始响应
+        """
+        if not response:
+            return ""
+
+        # 使用正则匹配 <informal_proof>...</informal_proof> 标签
+        pattern = re.compile(r"<informal_proof>(.*?)</informal_proof>", re.DOTALL | re.IGNORECASE)
+        matches = pattern.findall(response)
+        if matches:
+            return matches[0].strip()
+        else:
+            # 如果未找到标签，返回原始响应
+            return response.strip()
+
     # ------------------------------------------------------------------
     # Theorem Retrieval
     # ------------------------------------------------------------------
@@ -94,6 +115,7 @@ class ReasonerAgent(BaseAgent):
         Returns:
             _type_: _description_
         """
+
         user_prompt = self.prompt_loader.load_and_format(
             "user",
             "reasoner_search_query",
@@ -114,6 +136,7 @@ class ReasonerAgent(BaseAgent):
         problem,
         docstring,
         candidate_theorems: List[Dict[str, Any]],
+        error_message: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """挑选相关定理"""
         user_prompt = self.prompt_loader.load_and_format(
@@ -221,12 +244,32 @@ class ReasonerAgent(BaseAgent):
             useful_theorems_section=relevant_theorems,
             docstring=docstring,
         )
-        informal_proof = self.llm.get_response(
+        response = self.llm.get_response(
             [
                 {"role": "user", "content": user_prompt},
             ]
         )
+        # 提取 <informal_proof>...</informal_proof> 标签中的内容
+        informal_proof = self._extract_informal_proof(response)
         return informal_proof
+
+    def refine_informalproof(
+        self,
+        problem,
+        docstring,
+        informal_proof,
+    ):
+        user_prompt = self.prompt_loader.load_and_format(
+            "user",
+            "reasoner_refine_informal_proof",
+            problem=problem,
+            docstring=docstring,
+            informal_proof=informal_proof,
+        )
+        response = self.llm.get_response([{"role": "user", "content": user_prompt}])
+        # 提取 <informal_proof>...</informal_proof> 标签中的内容
+        refined_proof = self._extract_informal_proof(response)
+        return refined_proof
 
     def generate_sketch(self, problem: str, relevant_theorems: List[Dict[str, Any]], informal_proof: str) -> str:
         """生成证明带有step  sketch"""
@@ -242,8 +285,19 @@ class ReasonerAgent(BaseAgent):
                 {"role": "user", "content": user_prompt},
             ]
         )
-        logger.info(f"sketch response: {response}")
         return self._extract_lean_code(response)
+
+    def check_sketch_correctness(self, problem: str, docstring: str, proof_sketch: str):
+        user_prompt = self.prompt_loader.load_and_format(
+            "user",
+            "reasoner_check_sketch_have",
+            problem=problem,
+            docstring=docstring,
+            proof_sketch=proof_sketch,
+        )
+        response = self.llm.get_response([{"role": "user", "content": user_prompt}])
+        corrected_sketch = self._extract_lean_code(response)
+        return corrected_sketch
 
     def correct_sketch_error(
         self,
@@ -380,11 +434,13 @@ class ReasonerAgent(BaseAgent):
     def check_mathematic_correctness(
         self,
         subgoal,
+        sketch_assembled,
     ):
         user_prompt = self.prompt_loader.load_and_format(
             "user",
             "reasoner_check_mathematical_correctness",  #
             problem=subgoal,
+            sketch_assembled=sketch_assembled,
         )
         response = self.llm.get_response([{"role": "user", "content": user_prompt}])
 
@@ -414,6 +470,8 @@ class ReasonerAgent(BaseAgent):
 
     def refine_sketch_based_error(
         self,
+        problem,
+        docstring,
         sketch,
         error_justification,
     ):
@@ -423,6 +481,8 @@ class ReasonerAgent(BaseAgent):
         user_prompt = self.prompt_loader.load_and_format(
             "user",
             "reasoner_refine_sketch_based_error",
+            problem=problem,
+            docstring=docstring,
             sketch=sketch,
             error_message=error_justification,
         )
@@ -458,6 +518,20 @@ class ReasonerAgent(BaseAgent):
             proof=proof,
             error_message=error_message,
             augmented_theorems=augmented_theorems,
+        )
+        response = self.llm.get_response([{"role": "user", "content": user_prompt}])
+        return self._extract_lean_code(response)
+
+    def correct_final_proof_error(
+        self,
+        final_proof,
+        error_message,
+    ):
+        user_prompt = self.prompt_loader.load_and_format(
+            "user",
+            "reasoner_correct_final_proof_error",
+            final_proof=final_proof,
+            error_message=error_message,
         )
         response = self.llm.get_response([{"role": "user", "content": user_prompt}])
         return self._extract_lean_code(response)

@@ -1,0 +1,29 @@
+You are an informal-proof COMPRESSOR.
+
+Inputs:
+Problem:
+{problem}
+
+Informal description (may be partial):
+{docstring}
+
+Informal proof
+{informal_proof}
+
+Task:
+Rewrite the informal proof into a SHORT, CLEAN proof that still proves the Problem.
+
+Compression rules:
+1) Keep only steps that are necessary to reach the conclusion from the given hypotheses.
+2) Preserve correctness and match the Problem exactly (same hypotheses and conclusion). Do NOT change the claim.
+3) Do NOT introduce any new assumptions or extra lemmas not justified by the given hypotheses.
+4) Remove narrative, motivation, geometry story, and repeated facts; keep a tight chain of equations/inequalities and justifications.
+5) Merge adjacent algebra steps into one line when safe (e.g., “by rearranging”).
+6) If a step is wrong or irrelevant, delete it; if a correction is needed, make the smallest correction that restores validity.
+7) No Lean content (no tactics/lemma names/code).
+
+Output format (STRICT):
+<informal_proof>
+
+</informal_proof>
+- No extra text outside the tags.

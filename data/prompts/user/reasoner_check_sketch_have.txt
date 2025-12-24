@@ -1,0 +1,42 @@
+You are an expert in Lean 4 and formalization.
+
+Task:
+Review the generated Lean 4 proof sketch and determine whether it is structurally and mathematically consistent with the theorem statement and the refined informal proof. Then produce a corrected proof sketch.
+
+Inputs:
+Docstring (problem description/context):
+{docstring}
+
+Theorem statement (Lean goal):
+{problem}
+
+
+Generated Lean proof sketch to check:
+{proof_sketch}
+
+What you must do:
+1. Validate correctness of the sketch at the level of structure and mathematics:
+   - Detect fatal mathematical mismatches (wrong substitution, missing factors, wrong bounds, incorrect algebraic steps, wrong direction of implications, etc.).
+   - Detect Lean-structure issues that will likely break downstream proof search (missing dependencies, using facts without having proved them, relying on undefined constants, circular reasoning).
+2. If the sketch is repairable, minimally edit it to fix issues.
+3. If the sketch is not reasonably repairable, regenerate a new sketch from scratch that follows the refined informal proof.
+
+Output requirements:
+- Output ONLY a Lean 4 code block enclosed in ```lean ... ```.
+- Do NOT include any imports or `open` statements.
+- Do NOT change the theorem statement (the header and parameters) unless it is syntactically inconsistent with the provided {problem}. Prefer keeping it identical.
+- Use consistent indentation with spaces only.
+- Use `sorry` for ALL subgoal proofs (`have`/`lemma` steps), but DO NOT use `sorry` to close the main goal. The main goal must be finished using the established subgoals (`exact`, `simpa`, `calc`, etc.).
+- Do NOT nest `have` statements inside other `have` statements.
+- Every subgoal must be explicitly named.
+- One `have` per line (do not split a `have` statement across multiple lines).
+
+Repair policy:
+- Prefer minimal changes (fix the first problematic step and everything after it).
+- If minimal repair is not feasible (the sketch’s core approach is wrong), rewrite the entire proof sketch in a clean, provable structure aligned with the refined informal proof.
+
+Goal:
+Produce a proof sketch that is internally consistent, has correct mathematical transformations, and provides enough named subgoals to complete the main theorem without using `sorry` at the top level.
+
+Most important:
+- Do NOT nest `have` statements inside other `have` statements.

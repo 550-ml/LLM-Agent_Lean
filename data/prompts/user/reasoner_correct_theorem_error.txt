@@ -3,15 +3,27 @@ The following Lean 4 code has compilation errors. Please fix the errors while ma
 {error_message}
 
 Lean Hints:
-None
+1. When dealing with inequalities, equalities and arithmetic operations like subtraction or division in `ℕ` (natural numbers), beware of truncation. Use `ℝ`, `ℚ` or `ℤ` when possible for arithmetic operations. Avoid using `ℕ` unless required by the theorem statement.
+2. Be ESPECIALLY careful about implicit types while defining numeric literals. AVOID patterns like `0 - 1` or `1 / 2` without specifying the types.
+3. ALWAYS specify types when dealing with numeric values to avoid ambiguities and unexpected behavior.
+4. Use `simp only [specific_lemmas]` rather than bare `simp` to avoid unpredictable simplifications.
+5. Use `rw [← lemma]` for reverse direction. When `rw` fails, try `conv => rhs; rw [lemma]` to target specific subterms. nth_rw n [lemma] to rewrite only the nth occurrence.
+6. When `ring` fails on ring expressions, try `ring_nf` first to normalize, or cast to a concrete ring like `ℝ` where the tactic works better.
+7. Apply `norm_num` for concrete arithmetic calculations and `norm_cast` to simplify type coercions systematically.
+8. Use `by_contra h` for proof by contradiction, which introduces the negation of the goal as hypothesis `h`.
+9. If you get a `no goals to be solved` error, it means that the previous tactics already solved the goal, and you can remove the subsequent tactics.
+10. When proving theorems, ALWAYS write the proof in tactic mode, starting the proof with `:= by`.
+11. Do NOT use `begin`, `end` blocks in your proof. This is invalid in Lean 4.
+
 
 Instructions:
 1. Analyze what the theorem is trying to prove. Then, analyze why the error is happening, step-by-step. Add a brief explanation.
 2. Then, provide a corrected version of the Lean 4 code that addresses these specific errors.
-3. You should ONLY correct the main theorem that appears at the end. Do NOT change any of the helper theorems.
-4. Do NOT include any other Lean code blocks except for the proof. Do NOT include any imports or open statements.
-5. Do NOT use `sorry` in any part of the proof.
-6. Do NOT change anything in the original theorem statement.
-7. Do NOT include the helper theorem definitions in your response.
-8. Do NOT write a proof for any subgoal from scratch. ALWAYS use the supplied theorems.
+3. CRITICAL: You MUST output the COMPLETE theorem statement (starting with `theorem` keyword) followed by the corrected proof. Do NOT output only the proof part (starting from `by`). The output must include the full theorem declaration from `theorem` to the end of the proof.
+4. You should ONLY correct the main theorem that appears at the end. Do NOT change any of the helper theorems.
+5. Do NOT include any other Lean code blocks except for the complete theorem statement and proof. Do NOT include any imports or open statements.
+6. Do NOT use `sorry` in any part of the proof.
+7. Do NOT change anything in the original theorem statement.
+8. Do NOT include the helper theorem definitions in your response.
+9. Do NOT write a proof for any subgoal from scratch. ALWAYS use the supplied theorems.
 

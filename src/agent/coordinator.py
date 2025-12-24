@@ -28,14 +28,16 @@ class HilbertCoordinator:
         self.retriever = retriever
         self.verification = verification
         self.prover = prover
-        self.max_depth = 5
-        self.sketch_attemps = 5
-        self.sketch_correction_attemps = 5
-        self.theorem_corrections = 5
-        self.subgoal_corrections = 5
-        self.head_theorems_sketch = 5
-        self.prover_attemps = 1
-        self.general_llm_proof_attemps = 5
+        self.max_depth = 6
+        self.sketch_attemps = 3
+        self.sketch_correction_attemps = 3
+        self.theorem_corrections = 3
+        self.subgoal_corrections = 3
+        self.head_theorems_sketch = 3
+        self.prover_attemps = 3
+        self.general_llm_proof_attemps = 3
+        self.final_proof_verification_attemps = 5
+        self.sketch_compression_attemps = 3
 
     def generate_proof(
         self,
@@ -63,9 +65,9 @@ class HilbertCoordinator:
             logger.info(f"Sketch attempt {attempt + 1}/{self.sketch_attemps}")
             # 1. 检索相关mathlibs定理
             relevant_theorems = self.retrieve_theorems(problem, docstring)
-
             # 2. 生成证明sketch
             proof_sketch = self.generate_proof_sketch(
+                header,
                 problem,
                 relevant_theorems,
                 docstring,
@@ -97,22 +99,31 @@ class HilbertCoordinator:
         candidate_theorems = self.retriever.batch_retrieve(search_queries)
         logger.info(f"Candidate theorems: {candidate_theorems}")
         # 3. 挑选相关定理, <theorem>...</theorem>
-        relevant_theorems = self.reasoner.select_relevant_theorems(problem, docstring, candidate_theorems)
+        relevant_theorems = self.reasoner.select_relevant_theorems(
+            problem, docstring, candidate_theorems, error_message
+        )
         logger.info(f"relevant_theorems: {relevant_theorems}")
         return relevant_theorems
 
     # * 2. 生成证明sketch
     def generate_proof_sketch(
         self,
+        header: str,
         problem: str,
         relevant_theorems: List[Dict[str, Any]],
         docstring: str,
     ) -> str:
         """生成证明sketch"""
-        informal_proof = self.reasoner.generate_informal_proof(problem, relevant_theorems, docstring)  # 自然语言
+        full_code = header + "\n" + problem
+        informal_proof = self.reasoner.generate_informal_proof(full_code, relevant_theorems, docstring)  # 自然语言
         logger.info(f"Informal proof: {informal_proof}")
-        proof_sketch = self.reasoner.generate_sketch(problem, relevant_theorems, informal_proof)  # 证明sketch
+        # informal proof需要被验证，然后有问题的地方进行修改
+        # informal_proof = self.reasoner.refine_informalproof(full_code, docstring, informal_proof)
+        # logger.info(f"Refined informal proof: {informal_proof}")
+        proof_sketch = self.reasoner.generate_sketch(full_code, relevant_theorems, informal_proof)  # 证明sketch
         logger.info(f"Proof sketch: {proof_sketch}")
+        # checked_sketch = self.reasoner.check_sketch_correctness(full_code, docstring, proof_sketch)
+        # logger.info(f"Checked sketch: {checked_sketch}")
         return proof_sketch
 
     # * 3. 修复并验证sketch
@@ -135,19 +146,20 @@ class HilbertCoordinator:
             if sketch_syntactic is None:
                 return None, None, None
 
-            # 1.5. 压缩和优化 sketch 结构
-            sketch_compressed = self.reasoner.compress_sketch(sketch_syntactic, problem, docstring)
-            logger.info(f"Sketch compressed: {sketch_compressed}")
+            # # 1.5. 压缩和优化 sketch 结构
+            # for _ in range(self.sketch_compression_attemps):
+            #     sketch_syntactic = self.reasoner.compress_sketch(sketch_syntactic, problem, docstring)
+            #     logger.info(f"Sketch compressed: {sketch_syntactic}")
 
-            # 验证压缩后的 sketch 仍然语法正确
-            full_code_compressed = header + "\n" + sketch_compressed
-            verified_compressed, error_message_compressed = self.verification.execute(full_code_compressed)
-            if verified_compressed:
-                sketch_syntactic = sketch_compressed  # 使用压缩后的版本
-                logger.info("Compressed sketch verified successfully")
-            else:
-                logger.warning(f"Compressed sketch has errors, using original: {error_message_compressed}")
-                # 如果压缩后的版本有错误，继续使用原始版本
+            #     # 验证压缩后的 sketch 仍然语法正确
+            #     verified_compressed, error_message_compressed = self.verification.execute(
+            #         header + "\n" + sketch_syntactic
+            #     )
+            #     if verified_compressed:
+            #         logger.info("Compressed sketch verified successfully")
+            #         break
+            #     else:
+            #         logger.warning(f"Compressed sketch has errors, using original: {error_message_compressed}")
 
             # 2. 提取要证明的子定理
             subgoals = self.extract_subgoals(sketch_syntactic, header)
@@ -160,14 +172,18 @@ class HilbertCoordinator:
                 logger.warning("Failed to assemble proof from subgoals")
                 return None, None, None
             # 4. 验证子定理
-            valid, verified_subgoals, proved_subgoals, error_justification = self.validate_subgoals(subgoals, header)
+            valid, verified_subgoals, proved_subgoals, error_justification = self.validate_subgoals(
+                subgoals, header, sketch_assembled
+            )
             if valid:
-                logger.info(f"Subgoals validated: {len(verified_subgoals)} verified, {len(proved_subgoals)} proved")
+                logger.info(
+                    f"Subgoals validated: {len(verified_subgoals)} verified, {len(proved_subgoals)} proved, total subgoals: {len(subgoals)}"
+                )
                 logger.info(f"proved_subgoals: {proved_subgoals}")
-                return sketch_assembled, verified_subgoals, proved_subgoals
+                return sketch_assembled, subgoals, proved_subgoals
             else:
                 logger.warning(f"Subgoal validation failed: {error_justification}")
-                sketch = self.refine_sketch_based_error(sketch, error_justification)
+                sketch = self.refine_sketch_based_error(problem, docstring, sketch, error_justification)
 
         logger.warning("All sketch correction attempts failed")
         return None, None, None
@@ -304,19 +320,20 @@ class HilbertCoordinator:
         return None
 
     # * 3.4 证明子定理
-    def validate_subgoals(self, subgoals, header):
+    def validate_subgoals(self, subgoals, header, sketch_assembled):
         logger.info(f"Validating {len(subgoals)} subgoals")
         verified_subgoals = []
         proved_subgoals = {}
-        for subgoal in subgoals:
+        for index, subgoal in enumerate(subgoals):
             proof = self.attemp_proverllm_proof(subgoal, header)
             if proof is not None:
                 verified_subgoals.append(proof)
-                proved_subgoals[subgoal] = proof
+                proved_subgoals[index] = proof
             else:
                 # 重拍过程
+                continue
                 # 这一判断是为了在 LLM 自动证明失败后，通过 reasoner(agent) 再次用数学常识判断 subgoal 是否合理。这样可以补充 LLM 无法证明但实际合理的情况，提高子目标的通过率。如果也不合理，就及时返回错误和解释，避免无意义的尝试。
-                correct, justification = self.check_mathematic_correctness(subgoal)
+                correct, justification = self.check_mathematic_correctness(subgoal, sketch_assembled)
                 logger.info(f"Mathematical correctness: {correct}, justification: {justification}")
                 if correct:
                     verified_subgoals.append(subgoal)
@@ -332,9 +349,10 @@ class HilbertCoordinator:
         if self.prover is None:
             logger.warning("ProverAgent is not initialized, skipping prover proof attempt")
             return None
-
+        error_message = ""
+        proof = ""
         for _ in range(self.prover_attemps):
-            proof = self.prover.prove_subgoal(probelm, header)
+            proof = self.prover.prove_subgoal(probelm, header, error_message, previous_proof=proof)
             logger.info(f"Proof LLM: {proof}")
             if not proof:
                 continue
@@ -347,17 +365,20 @@ class HilbertCoordinator:
     def check_mathematic_correctness(
         self,
         subgoal,
+        sketch_assembled,
     ):
-        correct, justification = self.reasoner.check_mathematic_correctness(subgoal)
+        correct, justification = self.reasoner.check_mathematic_correctness(subgoal, sketch_assembled)
         return correct, justification
 
     def refine_sketch_based_error(
         self,
+        problem,
+        docstring,
         sketch,
         error_message,
     ):
         "sketch修复"
-        refined_sketch = self.reasoner.refine_sketch_based_error(sketch, error_message)
+        refined_sketch = self.reasoner.refine_sketch_based_error(problem, docstring, sketch, error_message)
         logger.info(f"Refined sketch: {refined_sketch}")
         return refined_sketch
 
@@ -371,29 +392,46 @@ class HilbertCoordinator:
         depth,
     ):
         """证明所有子问题"""
-        # proved_subgoals是dict，subgoals是list
-        # 先处理 None 情况，避免在列表推导式中出错
-        subgoals_proved = dict(proved_subgoals) if proved_subgoals is not None else {}
-        remaining = [s for s in subgoals if s not in subgoals_proved]
-        logger.info(f"Solving {len(remaining)} remaining subgoals (out of {len(subgoals)} total)")
-        for subgoal in remaining:
+        subgoals_proved = {}
+        remaining = []  # 保存 (original_index, subgoal) 元组
+        for index, subgoal in enumerate(subgoals):
+            if index in proved_subgoals:
+                subgoals_proved[index] = proved_subgoals[index]
+                logger.info(f"Subgoal {index} already proved, skipping")
+            else:
+                remaining.append((index, subgoal))
+                logger.info(f"Subgoal {index} not proved, adding to remaining: {subgoal[:100]}...")
+        logger.info(f"Need to solve {len(remaining)} remaining subgoals (out of {len(subgoals)} total)")
+        for original_index, subgoal in remaining:
             proof = self.solve_subgoal(subgoal, header, depth)
             if proof is not None:
-                subgoals_proved[subgoal] = proof
-                logger.info(f"Subgoal solved: {subgoal[:100]}...")
+                subgoals_proved[original_index] = proof
+                logger.info(f"Subgoal {original_index} solved: {subgoal[:100]}...")
+            else:
+                logger.warning(f"Subgoal {original_index} failed to generate proof: {subgoal[:100]}...")
+
+        # 检查是否所有 subgoal 都有证明
+        missing_indices = [idx for idx in range(len(subgoals)) if idx not in subgoals_proved]
+        if missing_indices:
+            logger.error(f"Missing proofs for subgoals: {missing_indices}")
+            logger.error("This may cause 'unknown identifier' errors in the final proof")
 
         # * 4.4 组装证明
         final_proof = self.concatenate_proofs(header, subgoals_proved, sketch_assembled)
         logger.info(f"Final proof assembled: {len(final_proof)} characters")
+        logger.info(f"Total subgoals: {len(subgoals)}, Proved: {len(subgoals_proved)}")
 
-        # 验证最终证明
-        verified, error_message = self.verification.execute(final_proof)
-        logger.info(f"Final proof verified: {verified}, Error message: {error_message}")
-        if verified:
-            return final_proof
-        else:
-            logger.warning(f"Final proof verification failed: {error_message}")
-            return None
+        # * 4.5 验证最终证明
+        for _ in range(self.final_proof_verification_attemps):
+            verified, error_message = self.verification.execute(final_proof)
+            logger.info(f"Final proof verified: {verified}, Error message: {error_message}")
+            if verified:
+                return final_proof
+            else:
+                final_proof = self.reasoner.correct_final_proof_error(final_proof, error_message)
+                final_proof = header + "\n" + final_proof
+                logger.info(f"Refined final proof: {final_proof}")
+        return None
 
     def concatenate_proofs(
         self,
@@ -412,12 +450,12 @@ class HilbertCoordinator:
         header,
         depth,
     ):
-        # * 4.1 用prover
-        logger.info(f"Attempting to solve subgoal with prover (depth={depth})")
-        proof = self.attemp_proverllm_proof(subgoal, header)
-        if proof is not None:
-            logger.info("Subgoal solved by prover")
-            return proof
+        # # * 4.1 用prover
+        # logger.info(f"Attempting to solve subgoal with prover (depth={depth})")
+        # proof = self.attemp_proverllm_proof(subgoal, header)
+        # if proof is not None:
+        #     logger.info("Subgoal solved by prover")
+        #     return proof
         # * 4.2 用通用LLM
         logger.info("Attempting to solve subgoal with general LLM")
         relevant_theorems = self.retrieve_theorems(subgoal, docstring="", error_message=None)

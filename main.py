@@ -6,7 +6,7 @@ PutnamBench 主入口文件
 import argparse
 import os
 import sys
-from typing import Dict, List, Optional
+from typing import List
 
 from dotenv import load_dotenv
 
@@ -78,26 +78,49 @@ def main():
     verification = VerificationAgent(lean_runner)
 
     prover_config = config_manager.get_prover_config()
-    model_path = prover_config.get("model_path", "./Goedel-LM/Goedel-Prover-V2-32B")
-    device_id = prover_config.get("device_id", 0)
-    if device_id == -1:
-        device_map = {"": "cpu"}
+    prover_mode = prover_config.get("model", "api")
+    if prover_mode == "api":
+        # API 模式
+        api_config = prover_config.get("api", {})
+        prover_llm = LLMFactory.create_from_dict(api_config)
+        prover = ProverAgent(llm=prover_llm)
     else:
-        device_map = {"": device_id}
-    prover = ProverAgent(
-        model_path=model_path,
-        device_map=device_map,
-        max_new_tokens=prover_config.get("max_new_tokens", 1024),
-    )
-    logger.info("✅ ProverAgent initialized successfully")
+        # 本地模式
+        model_path = prover_config.get("model_path", "./Goedel-LM/Goedel-Prover-V2-32B")
+        device_id = prover_config.get("device_id", 0)
+        if device_id == -1:
+            device_map = {"": "cpu"}
+        else:
+            device_map = {"": device_id}
+        prover = ProverAgent(
+            model_path=model_path,
+            device_map=device_map,
+            max_new_tokens=prover_config.get("max_new_tokens", 1024),
+        )
 
     coordinator = HilbertCoordinator(reasoner=reansoner, retriever=retriever, verification=verification, prover=prover)
 
-    # 3. 处理每个文件
+    # 3. 处理每个文件（为每个题目创建独立的日志文件夹）
     for filename in lean_files:
         problem = loader.load_file(filename)
+
+        # 从文件名提取题目名称（去掉 .lean 后缀）
+        problem_name = problem.file_name.replace(".lean", "")
+
+        # 为当前题目重新初始化 logger（日志会追加到同一个文件夹）
+        logger = config_manager.init_logger(problem_name=problem_name)
+        logger.info(f"✅ 开始处理题目: {problem_name}")
+        logger.info(f"文件路径: {problem.file_path}")
+
+        if prover_mode == "api":
+            logger.info("✅ ProverAgent initialized in API mode")
+        else:
+            logger.info("✅ ProverAgent initialized in local mode")
+
         logger.info(f"Problem: {problem.problem}")
+
         result = coordinator.generate_proof(problem.problem, problem.header, problem.docstring)
+        logger.info(f"✅ 题目 {problem_name} 处理完成")
         break
     # for filename in :
     #     result = process_single_file(filename, loader, config_manager)
@@ -116,6 +139,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     config_manager = ConfigManager(args.config)
+    # 初始化一个临时 logger（用于启动日志，后续每个题目会重新初始化）
     logger = config_manager.init_logger()
     logger.info(f"✅ 加载配置文件: {args.config}")
 

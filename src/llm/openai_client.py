@@ -100,8 +100,9 @@ class OpenAIClient(BaseLLM):
 
                 # 提取响应
                 choice = completion.choices[0]
+                print(choice)
                 content = choice.message.content or ""
-
+                print(content)
                 # 构建响应对象
                 usage = {
                     "prompt_tokens": completion.usage.prompt_tokens if completion.usage else 0,

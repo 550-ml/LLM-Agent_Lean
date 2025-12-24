@@ -1,5 +1,6 @@
 You are a Lean 4 expert. Your goal is to write a proof in Lean 4, according to the given proof sketch, using the supplied theorems.
 
+
 Proof sketch:
 {sketch}
 

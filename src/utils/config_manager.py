@@ -105,14 +105,90 @@ class ConfigManager:
         """获取最大重试次数"""
         return self.get_agent_config().get("max_retries", 5)
 
-    def init_logger(self):
+    def init_logger(self, problem_name: str = None):
         """
-        根据时间创建一个文件夹，并返回文件夹路径
+        初始化日志系统
+
+        Args:
+            problem_name: 题目名称（如 "putnam_2001_a1"），如果提供则按题目创建文件夹，
+                         否则按时间创建文件夹
+
+        Returns:
+            logging.Logger: 日志记录器
         """
         log_dir = self.get("logger.save_dir")
         log_config = self.get("logger.log_config")
-        save_dir = datetime.now().strftime(f"{log_dir}/%Y%m%d_%H%M%S")
+
+        if problem_name:
+            # 根据题目名称创建文件夹（清理文件名中的特殊字符）
+            safe_name = problem_name.replace("/", "_").replace("\\", "_").replace(".lean", "")
+            save_dir = f"{log_dir}/{safe_name}"
+        else:
+            # 如果没有提供题目名称，使用时间戳
+            save_dir = datetime.now().strftime(f"{log_dir}/%Y%m%d_%H%M%S")
+
         os.makedirs(save_dir, exist_ok=True)
-        setup_logging(sva_dir=save_dir, log_config=log_config)
+
+        # 查找下一个可用的日志文件名（info.log, info2.log, info3.log, ...）
+        log_filename = self._get_next_log_filename(save_dir)
+
+        # 清除现有的 handlers，避免重复添加
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers[:]:
+            # 关闭文件 handler 以释放文件句柄
+            if hasattr(handler, "close"):
+                handler.close()
+            root_logger.removeHandler(handler)
+
+        # 使用新的日志文件名设置 logger
+        setup_logging(sva_dir=save_dir, log_config=log_config, log_filename=log_filename)
+
         logger = logging.getLogger(__name__)
         return logger
+
+    def _get_next_log_filename(self, save_dir: str) -> str:
+        """
+        获取下一个可用的日志文件名
+
+        Args:
+            save_dir: 日志保存目录
+
+        Returns:
+            str: 日志文件名（如 "info.log", "info2.log", "info3.log"）
+        """
+        import glob
+
+        # 查找所有 info*.log 文件
+        pattern = os.path.join(save_dir, "info*.log")
+        existing_files = glob.glob(pattern)
+
+        if not existing_files:
+            # 如果没有现有文件，使用 info.log
+            return "info.log"
+
+        # 提取所有编号
+        numbers = []
+        for file in existing_files:
+            basename = os.path.basename(file)
+            if basename == "info.log":
+                numbers.append(0)  # info.log 对应编号 0
+            else:
+                # 提取 info 后面的数字（如 info2.log -> 2）
+                import re
+
+                match = re.match(r"info(\d+)\.log", basename)
+                if match:
+                    numbers.append(int(match.group(1)))
+
+        # 找到最大编号，下一个编号就是 max_number + 1
+        if numbers:
+            max_number = max(numbers)
+            next_number = max_number + 1
+        else:
+            next_number = 1
+
+        # 生成新的文件名
+        if next_number == 0:
+            return "info.log"
+        else:
+            return f"info{next_number}.log"

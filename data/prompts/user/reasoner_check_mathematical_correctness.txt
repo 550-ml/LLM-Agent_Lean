@@ -1,22 +1,33 @@
 You are an expert in mathematics.
 
-Your task is to evaluate whether the given mathematical theorem statement is mathematically correct. You do NOT have to provide a proof for the theorem in Lean.
+Your task is to assess whether the given theorem statement is mathematically sound and consistent with the provided proof sketch. You do NOT need to produce a Lean proof.
 
-Evaluation criteria:
-1. Mathematical validity: Check for logical errors, incorrect assumptions, or calculation mistakes.
-2. Do NOT flag general results or helper lemmas that are true independent of the given premises. ONLY flag inaccuracies or mistakes.
-3. Provability: Determine if the statement can be proven given the provided premises, or otherwise.
+Context (proof approach sketch):
+{sketch_assembled}
+
+What to check (relaxed criteria):
+1. Core mathematical correctness: Look for *fatal* logical errors, incorrect transformations (e.g., invalid substitutions), contradictions, or missing hypotheses that make the statement not provable in principle.
+2. Be tolerant of minor omissions: If some routine steps are omitted (algebraic simplifications, standard substitutions, basic domain conditions), do NOT mark it incorrect unless the omission is genuinely essential.
+3. Do NOT nitpick helper lemmas: If a helper lemma is generally true or irrelevant to correctness, do NOT flag it. Only flag issues that break the overall argument or the theorem statement itself.
+4. Provability relative to the sketch: Decide whether the theorem should be provable using the stated premises and the strategy indicated by the sketch, even if the sketch is incomplete.
+5. If the theorem is incorrect, propose the smallest plausible correction (e.g., fix a bound, remove an unintended factor, add a missing nonzero/positivity condition, correct a swapped variable).
 
 Assumptions:
-1. The given premises are mathematically correct. Do NOT check this.
-2. The syntax is guaranteed to be correct (do not assess syntax)
+- Treat the provided premises as correct; do NOT re-verify them.
+- Treat the Lean syntax as correct; do NOT comment on syntax.
 
 Theorem Statement:
 {problem}
 
-Report your answer as either:
-• YES - if the statement is mathematically correct
-• NO - if the statement has mathematical errors that prevent proof
+Output format:
+Return either:
+• YES — if the theorem statement is mathematically correct (no fatal issues)
+• NO — if the theorem statement has fatal mathematical errors preventing proof
 
-Also provide a brief justification for your decision in <justification></justification> tags, adding details about why the statement is correct or incorrect. If it is incorrect, also provide a description of how the error can be corrected. If there are missing arguments, make sure to add the relevant missing proof steps.
+Then provide a brief justification wrapped in:
+<justification> ... </justification>
 
+If you answer NO, include:
+- what is wrong (at a high level),
+- the minimal correction needed,
+- and, if relevant, the key missing reasoning steps that would be required after correction.

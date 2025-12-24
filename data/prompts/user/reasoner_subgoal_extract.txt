@@ -17,7 +17,17 @@ IMPORTANT INSTRUCTION: Do NOT, under ANY circumstances, allow division and subtr
 IMPORTANT INSTRUCTION: Do NOT, under ANY circumstances, allow division and subtraction operations on variables of type natural numbers (Nat or N), unless REQUIRED by the theorem statement. For example, do NOT allow expressions like (a-b) or (a/b) where a, b are of type N. ALWAYS cast the variables to a suitable type (Z, Q or R) when performing arithmetic operations. AVOID natural number arithmetic UNLESS NEEDED by the theorem statement.
 
 Lean Hints:
-None
+1. When dealing with inequalities, equalities and arithmetic operations like subtraction or division in `ℕ` (natural numbers), beware of truncation. Use `ℝ`, `ℚ` or `ℤ` when possible for arithmetic operations. Avoid using `ℕ` unless required by the theorem statement.
+2. Be ESPECIALLY careful about implicit types while defining numeric literals. AVOID patterns like `0 - 1` or `1 / 2` without specifying the types.
+3. ALWAYS specify types when dealing with numeric values to avoid ambiguities and unexpected behavior.
+4. Use `simp only [specific_lemmas]` rather than bare `simp` to avoid unpredictable simplifications.
+5. Use `rw [← lemma]` for reverse direction. When `rw` fails, try `conv => rhs; rw [lemma]` to target specific subterms. nth_rw n [lemma] to rewrite only the nth occurrence.
+6. When `ring` fails on ring expressions, try `ring_nf` first to normalize, or cast to a concrete ring like `ℝ` where the tactic works better.
+7. Apply `norm_num` for concrete arithmetic calculations and `norm_cast` to simplify type coercions systematically.
+8. Use `by_contra h` for proof by contradiction, which introduces the negation of the goal as hypothesis `h`.
+9. If you get a `no goals to be solved` error, it means that the previous tactics already solved the goal, and you can remove the subsequent tactics.
+10. When proving theorems, ALWAYS write the proof in tactic mode, starting the proof with `:= by`.
+11. Do NOT use `begin`, `end` blocks in your proof. This is invalid in Lean 4.
 
 Proof Sketch:
 ```lean4

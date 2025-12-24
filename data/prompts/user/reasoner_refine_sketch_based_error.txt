@@ -1,28 +1,52 @@
-You are an expert in writing Lean 4 proofs. You are given a Lean 4 proof sketch where one of the subgoals has some issues. Your task is to fix the issues and write a new proof sketch.
+You are an expert in writing Lean 4 proofs.
 
-Proof Sketch:
+You are given a Lean 4 proof sketch and a compilation error message. Your task is to produce a corrected proof sketch that either:
+(A) minimally edits the sketch to fix the error(s), or
+(B) if minimal editing is not reasonable (because the sketch structure is fundamentally incompatible with the goal), rewrites the sketch from scratch in a clean, provable structure.
+
+Problem:
+{problem}
+
+docstring:
+{docstring}
+
+Input proof sketch:
 {sketch}
 
-Issues:
+Compilation issues / error message:
 {error_message}
 
-Lean Hints:
-None
+Lean hints:
+1. When dealing with inequalities, equalities and arithmetic operations like subtraction or division in `ℕ` (natural numbers), beware of truncation. Use `ℝ`, `ℚ` or `ℤ` when possible for arithmetic operations. Avoid using `ℕ` unless required by the theorem statement.
+2. Be ESPECIALLY careful about implicit types while defining numeric literals. AVOID patterns like `0 - 1` or `1 / 2` without specifying the types.
+3. ALWAYS specify types when dealing with numeric values to avoid ambiguities and unexpected behavior.
+4. Use `simp only [specific_lemmas]` rather than bare `simp` to avoid unpredictable simplifications.
+5. Use `rw [← lemma]` for reverse direction. When `rw` fails, try `conv => rhs; rw [lemma]` to target specific subterms. nth_rw n [lemma] to rewrite only the nth occurrence.
+6. When `ring` fails on ring expressions, try `ring_nf` first to normalize, or cast to a concrete ring like `ℝ` where the tactic works better.
+7. Apply `norm_num` for concrete arithmetic calculations and `norm_cast` to simplify type coercions systematically.
+8. Use `by_contra h` for proof by contradiction, which introduces the negation of the goal as hypothesis `h`.
+9. If you get a `no goals to be solved` error, it means that the previous tactics already solved the goal, and you can remove the subsequent tactics.
+10. When proving theorems, ALWAYS write the proof in tactic mode, starting the proof with `:= by`.
+11. Do NOT use `begin`, `end` blocks in your proof. This is invalid in Lean 4.
 
-Rules:
-1. Same proof level = same indentation: All tactics at the same logical level must use identical indentation
-2. Consistent characters: Use either tabs OR spaces consistently (don't mix)
-3. Proper nesting: Indent sub-proofs one level deeper than their parent
-4. Do NOT nest `have` statements in each other. Write different have statements for different sub goals.
-5. Ensure all sub goals are named. Do NOT create anonymous have statements.
-6. Do NOT include any imports or open statements.
-7. One line = One `have` subgoal. Do NOT split subgoals across different lines.
-8. Use proper Lean 4 syntax and conventions. Ensure the proof sketch is enclosed in triple backticks ```lean```
-9. Use `sorry` for all subgoal proofs - focus on structure, not implementation
-10. **Do NOT use `sorry` for the main goal proof** - use your subgoals to prove it
-11. NEVER use `sorry` IN the theorem statement itself
-12. Ensure subgoals collectively provide everything needed for the main proof
-13. Make the logical dependencies between subgoals explicit. Ensure that the subgoals are valid and provable in Lean 4.
-14. Modify only the incorrect subgoal and everything that follows it in the proof sketch. Leave all preceding portions unchanged.
-15. Either modify the problematic subgoals to fix the errors, or add additional subgoals to fill in the missing mathematical arguments.
+Strict output requirements:
+1. Output ONLY a Lean 4 code block wrapped in triple backticks: ```lean ... ```
+2. Do NOT include any imports or `open` statements.
+3. Use consistent indentation: spaces only (no tabs). Same logical level = same indentation.
+4. Do NOT nest `have` statements inside other `have` statements.
+5. Every subgoal must be named: use `have <name> : ... := by sorry` (no anonymous `have`).
+6. One `have` per line (do not split the statement of a `have` across multiple lines).
+7. Use `sorry` for ALL subgoal proofs.
+8. Do NOT use `sorry` for the MAIN goal proof; the main proof must conclude using the subgoals (e.g., `exact`, `simpa`, `calc`, etc.).
+9. NEVER use `sorry` inside the theorem statement itself.
 
+Editing policy:
+- Prefer option (A): modify only the first incorrect subgoal and everything that follows it. Keep all preceding parts unchanged.
+- If (A) is not feasible (e.g., the sketch’s structure prevents any correct proof, or the error is caused by earlier unavoidable issues), then choose option (B) and regenerate a complete proof sketch that is consistent, well-structured, and directly addresses the theorem goal.
+
+What “fix” means:
+- Resolve type mismatches, missing arguments, incorrect lemma usage, wrong variable names/binders, and incorrect dependencies.
+- If necessary, add new named subgoals after the failing point to bridge missing reasoning steps.
+- Do not over-engineer: keep the sketch minimal, but sufficient to prove the main goal.
+
+Return the final corrected proof sketch.

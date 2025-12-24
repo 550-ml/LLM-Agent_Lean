@@ -1,42 +1,43 @@
-You are a Lean 4 expert. Your task is to compress and optimize a proof sketch by removing redundancy while maintaining correctness.
+You are a Lean 4 SKETCH COMPRESSOR.
 
-Problem Statement:
+Goal:
+Given a Lean 4 proof sketch (with many `have ... := by sorry` placeholders), produce a SHORTER sketch that is easier to assemble into the final proof, while preserving all needed intermediate facts.
+
+Inputs:
+Problem:
 {problem}
 
-Original Sketch:
+Sketch (Lean 4 code, may be long/redundant):
 {sketch}
 
-Instructions:
-1. Remove redundant `have` statements:
-   - If a `have` statement only restates an existing hypothesis or earlier `have`, remove it.
-2. Carefully merge subgoals:
-   - Only merge subgoals if the resulting statement is still atomic and will be used as a single unit in the final proof.
-   - Do NOT merge subgoals that are used separately in the final `use` / `constructor` assembly.
-3. Simplify trivial steps:
-   - Remove intermediate steps that are purely cosmetic (e.g., unnecessary casts or aliasing `have`s).
-4. Keep essential structure:
-   - Maintain the logical flow and all necessary subgoals required to assemble the final proof.
-5. Preserve correctness:
-   - The refactored sketch must remain mathematically correct and structurally sufficient to prove the theorem.
+Allowed edits (ONLY these):
+A) Delete redundant `have`s.
+B) Rename `have` binders to avoid clashes or to reuse an existing fact name.
+C) Replace a `have` proof body by `by sorry` (keep the statement) if the original body contained tactics beyond `sorry`.
+D) Merge two `have`s ONLY if:
+   - the second is a direct restatement of the first by definitional equality / rewriting of numerals / simple associativity-commutativity normal form,
+   - and the merged result will be used as a single unit (not separately referenced later).
+Otherwise, do NOT merge.
+Do NOT introduce or keep any auxiliary lemma/have that proves the value of *_solution (e.g. have hsol : putnam_1987_b1_solution = 1). Treat *_solution as a fixed definition: finish the proof by rewriting with [putnam_1987_b1_solution] (or its definitional equation) instead of creating a new subgoal about it.
 
-STRICT RULES (must follow):
-- Do NOT change the theorem statement in any way.
-- Do NOT add or remove quantifiers in the theorem statement.
-- Do NOT introduce new lemmas or definitions outside the proof.
-- Every `have` statement MUST be written in the form:
-  `have <name> : <proposition> := by sorry`
-- Do NOT use any tactics other than `sorry` inside `have` proofs.
-- Do NOT use `sorry` in the main proof.
-- Do NOT nest `have` statements inside other `have` proofs.
-- One line = one `have` statement.
-- Do NOT merge multiple logically independent facts into a single `have`.
+Strict constraints:
+1) Do NOT change the theorem statement (name/params/types/goal) in any way.
+2) Do NOT introduce any new lemmas/defs/abbrevs outside the proof.
+3) Do NOT introduce new `have` statements. (Only delete/rename/normalize existing ones.)
+4) Do NOT reorder major proof blocks. Keep the original top-to-bottom flow.
+5) Every remaining `have` MUST be exactly one line:
+   `have <name> : <Prop> := by sorry`
+6) No nested `have` statements anywhere.
+7) The main proof (the final `by ...`) must contain NO `sorry`.
+8) Do NOT use any tactics other than `sorry` inside `have` proofs (i.e., `by sorry` only).
+9) Keep indentation consistent (spaces only).
 
-Optimization Guidelines:
-- Remove `have` statements that only rename or re-cast existing hypotheses.
-- Prefer direct `let` bindings for witnesses over existential unpacking when it simplifies the structure.
-- Keep the minimal set of `have` statements needed for the final assembly.
+Redundancy deletion rules (apply aggressively):
+- If `have hX : P := by sorry` where `P` is already available as a hypothesis or earlier `have`, delete it and redirect later references to the existing name.
+- If a `have` only renames (`have h2 : P := h1`) or only re-casts the same statement, delete it.
+- If two `have`s differ only by commutativity of addition/multiplication, or by rewriting `0.5` to `(1:ℝ)/2`, keep ONE canonical version and delete the rest; update references accordingly.
+- Keep any `have` whose name is referenced later, unless you can safely redirect all references to an earlier equivalent fact.
 
-Output Requirements:
-- Return exactly one Lean 4 code block enclosed in ```lean```.
-- The compressed sketch must be shorter or equal in length to the original.
-- Maintain valid Lean 4 syntax and consistent indentation.
+Output:
+Return EXACTLY ONE Lean 4 code block (```lean ... ```), containing the same theorem statement and the compressed proof sketch.
+No commentary outside the code block.
